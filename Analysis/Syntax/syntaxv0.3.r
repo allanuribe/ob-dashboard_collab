@@ -1,4 +1,4 @@
-###Syntax Notes ###############################################
+#Syntax Notes ###############################################
 #syntax info:
 # Created by :Allan Uribe 
 # date created March 8, 2021
