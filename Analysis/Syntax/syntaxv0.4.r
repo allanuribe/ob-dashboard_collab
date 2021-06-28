@@ -1,3 +1,4 @@
+#This is just a test from juliana truing a git training with allan 
 #Syntax Notes ###############################################
 #syntax info:
 # Created by :Allan Uribe 
