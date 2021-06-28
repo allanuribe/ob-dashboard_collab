@@ -2,7 +2,7 @@
 #syntax info:
 # Created by :Allan Uribe 
 # date created March 8, 2021
-# date last modified: April 3, 2021
+# date last modified: June 28, 2021
 # last modified by: Allan Uribe 
 #' purpose:   crating version 0.3 of  a dynamic dashboard in PowerBI with data 
 #' management and back end tables created in R. 
@@ -115,7 +115,7 @@ ri7_query <- paste(
 
 cat(ri7_query)
 ri7 <- dbGetQuery(con, ri7_query)
-# use this SQL select statement to get all the columns with the original names 
+ # use this SQL select statement to get all the columns with the original names 
 ##ri7_all <-dbGetQuery(con, "SELECT * FROM ANL_RI7_SAM_Case")
 
 # Pull in the Current case table ---- 
@@ -176,6 +176,27 @@ cat(sc3_query)
 sc3 <- dbGetQuery(con, sc3_query)
 # you can use this code to pull the entire table in, rather than just select columns 
 ##sc3 <- dbGetQuery(con, "SELECT * FROM VN_ANL_SC3_SAM_part")
+V_Stand_Dates_var_keep <- c(
+    "stand_id as standid"
+    , "stand_name as stand_name"
+    , "Stand_Start_Dt as stand_start_date"
+    , "Stand_End_Dt as stand_end_date"
+    , "foactive"        
+    , "mecactive"
+    , "fosite"
+    , "mecsite"
+)
+# putting the query together in an R object so it can be refrenced in other R functions. 
+
+V_Stand_Dates_query <- paste("SELECT", paste(V_Stand_Dates_var_keep, sep = "",collapse= ","),
+                   "FROM V_Stand_Dates")
+
+cat(SAM_stand_query)
+# this actually pulls the data from the server into R with columns renamed  
+V_Stand_Dates <- dbGetQuery(con, V_Stand_Dates_query)
+
+# pull all data in SAM stand in with original var names 
+#V_Stand_Dates <- dbGetQuery(con, "SELECT * FROM V_Stand_Dates")
 
 # Don't forget to disconnect from the SQL server after pulling in the data needed----
 dbDisconnect(con)
@@ -798,7 +819,23 @@ case_fact <- case_fact %>%
            completed_roll_avg_9D= rollmean(completed_screener,k=9, fill=NA))%>%
     ungroup()
 
+V_Stand_Dates$stand_cycle <- with(
+    V_Stand_Dates,
+    ifelse(year(stand_start_date) %in% c(1999,2000),"99-00",
+    ifelse(year(stand_start_date) %in% c(2001,2002),"01-02",
+    ifelse(year(stand_start_date) %in% c(2003,2004),"03-04",
+    ifelse(year(stand_start_date) %in% c(2005,2006),"05-06",
+    ifelse(year(stand_start_date) %in% c(2007,2008),"07-08",
+    ifelse(year(stand_start_date) %in% c(2009,2010),"09-10",
+    ifelse(year(stand_start_date) %in% c(2011,2012),"11-12",
+    ifelse(year(stand_start_date) %in% c(2013,2014),"13-14",       
+    ifelse(year(stand_start_date) %in% c(2015,2016),"15-16",       
+    ifelse(year(stand_start_date) %in% c(2017,2018),"17-18",
+    ifelse(year(stand_start_date) %in% c(2019,2020),"19-20",
+    ifelse(year(stand_start_date) %in% c(2021,2022),"21-22",9999
+           )))))))))))))
 
+freq(V_Stand_Dates$stand_cycle)
 
 #I have been trying to figure out how to subset when running some other procedure.
 #finally got it 
@@ -823,7 +860,7 @@ freq(case_fact$completed_screener_with_sp[subset1])
 freq(case_fact$completed_screener_without_SP_neighbor[subset1])
 freq(case_fact$screener_nonresponse[subset1])
 freq(case_fact$screener_nonresponse_available_dwellings[subset1])
-freq(case_fact$completed_screener4cat[subset1])
+freq(case_factv04$completed_screener4cat[subset1])
 
 
 
@@ -833,20 +870,20 @@ freq(case_fact$available_released_dwelling[which(case_fact$standid ==398)])
 # fast writing CSV to locker for import to powerBI
 fwrite(case_fact, file= "L:/2021/DHANES dashboard/V0.4/case_factv0.4.csv")
 
-fwrite(participant_deatails, file="L://v0.3/participant_detailsv0.3.csv")
+fwrite(participant_deatails, file="L:/2021/DHANES dashboard/V0.4/participant_detailsv0.4.csv")
 
-fwrite(stand_demensions,file = 'L://v0.3/stand_demensions.csv')
+fwrite(stand_demensions,file = 'L:/2021/DHANES dashboard/V0.4/stand_demensions.csv')
 fwrite(participant_demographics_slicer, 
        file = "L://v0.3/participant_demographics_slicer.csv")
 fwrite(gender_labels,file = "L://v0.3/gender_labels.csv")
 fwrite(race_labels,file = "L://v0.3/race_labels.csv")
-fwrite(Active_stand_label, file = "L://v0.3/active_stand_label.csv" )
+fwrite(Active_stand_label, file = "L:/2021/DHANES dashboard/v0.4/active_stand_label.csv" )
 fwrite(screener_pending3cat_labels, file = "L://v0.3/screener_pending3cat_labels.csv")
 fwrite(completed_screener4cat, file = "L://v0.3/completed_screener4cat.csv")
 fwrite(participant_demographics_slicer, file="L://v0.3/participant_demographics_slicer.csv")
 fwrite(visio_screener_process, file="L://v0.3/visio_screener_process.csv")
 fwrite(visio_screener_process_inbetween, file="L://v0.3/visio_screener_process_inbetween.csv")
-
+fwrite(V_Stand_Dates, file = "L:/2021/DHANES dashboard/V0.4/V_Stand_Dates.csv" )
 
 
 
