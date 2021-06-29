@@ -832,7 +832,7 @@ V_Stand_Dates$stand_cycle <- with(
     ifelse(year(stand_start_date) %in% c(2015,2016),"15-16",       
     ifelse(year(stand_start_date) %in% c(2017,2018),"17-18",
     ifelse(year(stand_start_date) %in% c(2019,2020),"19-20",
-    ,9999
+    ifelse(year(stand_start_date) %in% c(2020,2021),"20-21",9999
            )))))))))))))
 
 freq(V_Stand_Dates$stand_cycle)
