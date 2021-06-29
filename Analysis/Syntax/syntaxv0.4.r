@@ -1,4 +1,3 @@
-#This is just a test from juliana truing a git training with allan 
 #Syntax Notes ###############################################
 #syntax info:
 # Created by :Allan Uribe 
@@ -192,7 +191,7 @@ V_Stand_Dates_var_keep <- c(
 V_Stand_Dates_query <- paste("SELECT", paste(V_Stand_Dates_var_keep, sep = "",collapse= ","),
                    "FROM V_Stand_Dates")
 
-cat(SAM_stand_query)
+cat(V_Stand_Dates_query)
 # this actually pulls the data from the server into R with columns renamed  
 V_Stand_Dates <- dbGetQuery(con, V_Stand_Dates_query)
 
@@ -833,7 +832,7 @@ V_Stand_Dates$stand_cycle <- with(
     ifelse(year(stand_start_date) %in% c(2015,2016),"15-16",       
     ifelse(year(stand_start_date) %in% c(2017,2018),"17-18",
     ifelse(year(stand_start_date) %in% c(2019,2020),"19-20",
-    ifelse(year(stand_start_date) %in% c(2021,2022),"21-22",9999
+    ,9999
            )))))))))))))
 
 freq(V_Stand_Dates$stand_cycle)
