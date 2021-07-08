@@ -83,3 +83,9 @@ fwrite(Completed_Screening_forcast, file="l://v0.3/completed_screeening_forcast.
 #' figuring out the SP counts.   We can use the person table Ri1 which has 152,xxx people 
 #' on it.  Trying not to have duplicate date in the data model for the visual.  instead 
 #' use the case table 
+
+
+dbWriteTable(write_con, name = "test", value = Completed_Screening_forcast, row.names = FALSE)
+
+check695<- subset(participant_deatails, standid==695)
+case_check695<- subset(case_fact, standid==695)
