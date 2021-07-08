@@ -680,6 +680,26 @@ participant_demographics_slicer$valuelabel[is.na(participant_demographics_slicer
 
 freq(participant_demographics_slicer$valuelabel)
 
+participant_ethnicity_labels <- data.frame(
+    value=c(1,2,3,4,7,9)
+    ,ethnicity_description=c(
+        '1. not in codebook'
+        ,'2. Latino'
+        ,'3. Not Latino'
+        ,'4. not in codebook'
+        ,'7. Refused'
+        ,"9. Don't Know" 
+    ))
+
+Interview_type_labels <- data.frame(
+    value=c(1,2,3,4)
+    ,ethnicity_description=c(
+        '1. In-Person'
+        ,'2. Phone'
+        ,'3. Paper'
+        ,'4. Web'
+    ))
+
 # creating gender label table
 gender_labels<-data.frame(value=c(1,2,7,9)
                           ,description=c(
