@@ -89,3 +89,12 @@ dbWriteTable(write_con, name = "test", value = Completed_Screening_forcast, row.
 
 check695<- subset(participant_deatails, standid==695)
 case_check695<- subset(case_fact, standid==695)
+
+# trying to figure out the logic for perticipantid when the relationship module is done at a different time 
+filter(qtype1,is.na( participantid))
+filter(qtype2,is.na( participantid))
+
+count(filter(qtype1,is.na( participantid)))
+count(filter(qtype2,is.na( participantid)))
+
+filter(joined,is.na(participantid.x) & !is.na(participantid.y) & case_disposition %in% c(11:15))

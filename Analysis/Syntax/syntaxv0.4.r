@@ -84,6 +84,16 @@ con <- dbConnect(
     )
 
 
+write_con <- dbConnect(
+    odbc(),
+    Driver = "SQL Server",
+    Server = "DSPP-HANE-1601",
+    Database = "HANES_DBD_DEV",
+    Trusted_Connection = "True",
+    UID = "qsj2",
+    PWD = rstudioapi::askForPassword("Database password"),
+    Port = 1433
+)
 # Pull i ri7 table from the ANL----
 #'Ri7 table is going to the foundation for the fact table in the dashboard.  there is 
 #'a record for each case.  a case is created for each part of the study that is completed
@@ -106,6 +116,7 @@ ri7_var_keep <- c(
     , "STAPSUSE as spanish_interview"
     , "STAINTDT as case_date"
     , "MAQ300 as case_where_completed"
+    , "RIQ004 as interview_mode"
 )
 
 # create R object with the SQL query
@@ -186,7 +197,7 @@ V_Stand_Dates_var_keep <- c(
     , "fosite"
     , "mecsite"
 )
-# putting the query together in an R object so it can be refrenced in other R functions. 
+# putting the query together in an R object so it can be referenced in other R functions. 
 
 V_Stand_Dates_query <- paste("SELECT", paste(V_Stand_Dates_var_keep, sep = "",collapse= ","),
                    "FROM V_Stand_Dates")
@@ -197,6 +208,28 @@ V_Stand_Dates <- dbGetQuery(con, V_Stand_Dates_query)
 
 # pull all data in SAM stand in with original var names 
 #V_Stand_Dates <- dbGetQuery(con, "SELECT * FROM V_Stand_Dates")
+
+Web_Mailing_keep <- c(
+    "SDASTAND as standid"
+    , "SDASEGMT as segmentid"
+    , "SDASERAL as dwellingid"
+    , "RIAMALSP as mailing_type"
+    , "RIAMALS as mailing_status"        
+    , "RIAMALWP as web_passcode"
+    , "RIAMALEM as employee_id"
+)
+
+Web_Mailing_query <- paste(
+    "SELECT", paste(
+        Web_Mailing_keep, sep = "",collapse= ","),
+        "FROM V_ANL_NH_Web_Mailing")
+
+cat(Web_Mailing_query)
+
+V_ANL_NH_Web_Mailing <- dbGetQuery(con, Web_Mailing_query)
+
+
+
 
 # Don't forget to disconnect from the SQL server after pulling in the data needed----
 dbDisconnect(con)
@@ -210,6 +243,10 @@ case_fact <- sqldf(('SELECT A.*
                    FROM ri7 as A 
                    LEFT JOIN curr_case as B
                    ON A.caseid=B.caseid'),drv="SQLite")
+
+
+
+
 
 # deleting source tables.   no longer needed since we joined them together. 
 remove(curr_case,ri7)
@@ -273,7 +310,7 @@ case_fact$is_dwelling <- ifelse(case_fact$case_type==1,1,0)
 # organize columns in the order that is easier to create the various keys that we need.----
 # Also trying to understand the relationship between these columns.   
 # Family number is not assigned to screening or relationship case records.  
-case_fact <- case_fact[,c(2,3,4,6,5,8,7,1,9:23)]
+case_fact <- case_fact[,c(2,3,4,6,5,8,7,1,9:25)]
 
 # sort the rows by (see below)
 # checking some stuff to understand the relationship between these columns
@@ -326,7 +363,7 @@ stack.type3M$participantid2 <- stack.type3M$participantid
 case_fact <-bind_rows(stack.joined.qtype2,stack.type3M)
 
 #sort columsn to visually inspect that the assignment has worked as intended
-case_fact <- case_fact[,c(1:6,24,25,7:23)]
+case_fact <- case_fact[,c(1:6,24,25,7:23,26,27)]
 #sort rows for visual insopection
 case_fact<- case_fact %>% 
     arrange(
@@ -530,6 +567,18 @@ case_fact$completed_screener4cat <- with(
     & (complected_screener_without_SP==0)
     & (fi_assigned_screener=1),5,NA))))))
 
+#creating a count of completed screenings.  Originally created for forecasting models.----
+Completed_Screening_forcast <- case_fact %>% 
+    group_by(standid,date(case_fact$case_date))%>%
+    summarise(number_of_complete_screenings =sum(completed_screener,na.rm=T))
+
+
+Completed_Screening_forcast <- case_fact %>% 
+    group_by(standid,date(case_fact$case_date))%>%
+    summarise(N_aggragated_obs = n(),
+              number_of_complete_screenings =sum(completed_screener,na.rm=T)) %>%
+    mutate(cumsum(number_of_complete_screenings))
+
 
 #Question : why cant i just do the assigned minus the completes
 case_fact$screener_nonresponse <-with(
@@ -701,6 +750,64 @@ participant_demographics_slicer$valuelabel[is.na(participant_demographics_slicer
 
 freq(participant_demographics_slicer$valuelabel)
 
+participant_ethnicity_labels <- data.frame(
+    value=c(1,2,3,4,7,9)
+    ,ethnicity_description=c(
+        '1. not in codebook'
+        ,'2. Latino'
+        ,'3. Not Latino'
+        ,'4. not in codebook'
+        ,'7. Refused'
+        ,"9. Don't Know" 
+    ))
+
+Interview_type_labels <- data.frame(
+    value=c(1,2,3,4)
+    ,ethnicity_description=c(
+        '1. In-Person'
+        ,'2. Phone'
+        ,'3. Paper'
+        ,'4. Web'
+    ))
+
+# creating gender label table
+gender_labels<-data.frame(value=c(1,2,7,9)
+                          ,description=c(
+                              "1. Male"
+                              ,"2. Female"
+                              ,"3. Refused"
+                              ,"4. Don't Know"))
+# create the race label table 
+race_labels<-data.frame(value=c(1,2,3,4,7,9)
+                        ,description=c(
+                            "1. White"
+                            ,"2. Black"
+                            , "3. Other"
+                            , "4. Asian"
+                            ,"5. Refused"
+                            ,"6. Don't Know"))
+
+# create the screening pending label catagory
+screener_pending3cat_labels <- data.frame(
+    value=c(1,2,3,4,NA)
+    ,screener_pending3cat_description=c(
+        "Screener Not Worked"
+        ,"Screener in Progress"
+        , "interm Screening refusal"
+        , "contact dashboard manager about recoding error"
+        , "contact dashboard manager about missing data"))
+
+# create the completed screening label catagory
+completed_screener4cat <- data.frame(
+    value=c(1,2,3,4,5,NA)
+    ,completed_screener4cat_description=c(
+        "completed screener without SP neighbor"
+        ,"completed screener with sp"
+        , "completed screener with sp neighbor"
+        , "completed screener without SP"
+        , "contact dashboard manager about recoding error"
+        , "contact dashboard manager about missing data"))
+
 # creating gender label table
 gender_labels<-data.frame(value=c(1,2,7,9)
                           ,description=c(
@@ -727,6 +834,23 @@ screener_pending3cat_labels <- data.frame(
         , "interm Screening refusal"
         , "contact dashboard manager about recoding error"
         , "contact dashboard manager about missing data"))
+
+spanish_interview_labels <- data.frame(
+    value=c(1,2)
+    ,spanish_interview_description=c(
+        'Spanish'
+        ,"language other than Spanish"
+    ))
+case_where_completed_label <- data.frame(
+    value=c(1,2,3,4,5)
+    ,case_where_completed_description=c(
+        'Home'
+        ,'NHANES Office'
+        ,'Work'
+        ,'Library'
+        ,'Other'
+    )
+)
 
 # create the completed screening label catagory
 completed_screener4cat <- data.frame(
@@ -821,28 +945,107 @@ case_fact <- case_fact %>%
 
 V_Stand_Dates$stand_cycle <- with(
     V_Stand_Dates,
-    ifelse(year(stand_start_date) %in% c(1999,2000),"99-00",
-    ifelse(year(stand_start_date) %in% c(2001,2002),"01-02",
-    ifelse(year(stand_start_date) %in% c(2003,2004),"03-04",
-    ifelse(year(stand_start_date) %in% c(2005,2006),"05-06",
-    ifelse(year(stand_start_date) %in% c(2007,2008),"07-08",
-    ifelse(year(stand_start_date) %in% c(2009,2010),"09-10",
-    ifelse(year(stand_start_date) %in% c(2011,2012),"11-12",
-    ifelse(year(stand_start_date) %in% c(2013,2014),"13-14",       
-    ifelse(year(stand_start_date) %in% c(2015,2016),"15-16",       
-    ifelse(year(stand_start_date) %in% c(2017,2018),"17-18",
-    ifelse(year(stand_start_date) %in% c(2019,2020),"19-20",
-    ifelse(year(stand_start_date) %in% c(2020,2021),"20-21",9999
+    ifelse(year(stand_start_date) %in% c(1999,2000),"1999-2000",
+    ifelse(year(stand_start_date) %in% c(2001,2002),"2001-2002",
+    ifelse(year(stand_start_date) %in% c(2003,2004),"2003-2004",
+    ifelse(year(stand_start_date) %in% c(2005,2006),"2005-2006",
+    ifelse(year(stand_start_date) %in% c(2007,2008),"2007-2008",
+    ifelse(year(stand_start_date) %in% c(2009,2010),"2009-2010",
+    ifelse(year(stand_start_date) %in% c(2011,2012),"2011-2012",
+    ifelse(year(stand_start_date) %in% c(2013,2014),"2013-2014",       
+    ifelse(year(stand_start_date) %in% c(2015,2016),"2015-2016",       
+    ifelse(year(stand_start_date) %in% c(2017,2018),"2017-2018",
+    ifelse(year(stand_start_date) %in% c(2019,2020),"2019-2020",
+    ifelse(year(stand_start_date) %in% c(2021,2022),"2021-2022",9999
            )))))))))))))
 
 freq(V_Stand_Dates$stand_cycle)
 
+# form joining at the dwelling level 
+V_ANL_NH_Web_Mailing$dwelling_key <- paste(
+    V_ANL_NH_Web_Mailing$standid
+    ,V_ANL_NH_Web_Mailing$segmentid
+    ,V_ANL_NH_Web_Mailing$dwellingid, sep = "_"
+)
+
+
+V_ANL_NH_Web_Mailing$advance_letter <- ifelse(
+    (V_ANL_NH_Web_Mailing$mailing_type== 1 & 
+         V_ANL_NH_Web_Mailing$mailing_status==2),1,0
+        
+)
+
+V_ANL_NH_Web_Mailing$advance_Postcard <- ifelse(
+    (V_ANL_NH_Web_Mailing$mailing_type== 2 & 
+         V_ANL_NH_Web_Mailing$mailing_status==2),1,0
+    
+)
+
+V_ANL_NH_Web_Mailing$xpress_delivery <- ifelse(
+    (V_ANL_NH_Web_Mailing$mailing_type== 3 & 
+         V_ANL_NH_Web_Mailing$mailing_status==2),1,0
+    
+)
+
+
+V_ANL_NH_Web_Mailing$final_reminder <- ifelse(
+    (V_ANL_NH_Web_Mailing$mailing_type== 4 & 
+         V_ANL_NH_Web_Mailing$mailing_status==2),1,0
+    
+)
+
+V_ANL_NH_Web_Mailing$supplemental <- ifelse(
+    (V_ANL_NH_Web_Mailing$mailing_type== 5 & 
+         V_ANL_NH_Web_Mailing$mailing_status==2),1,0
+    
+)
+
+V_ANL_NH_Web_Mailing$mailing4cat <- with( 
+    V_ANL_NH_Web_Mailing,
+    ifelse((advance_letter==1 & 
+               advance_Postcard==0 &
+               xpress_delivery==0 &
+               final_reminder==0 &
+               supplemental==0),1,
+    ifelse((advance_letter==0 & 
+               advance_Postcard==1 &
+               xpress_delivery==0 &
+               final_reminder==0 &
+               supplemental==0),2,
+    ifelse((advance_letter==0 & 
+            advance_Postcard==0 &
+            xpress_delivery==1 &
+            final_reminder==0 &
+            supplemental==0),3,
+    ifelse((advance_letter==0 & 
+             advance_Postcard==0 &
+             xpress_delivery==0 &
+             final_reminder==0 &
+             supplemental==1),4,
+    ifelse((advance_letter==0 & 
+           advance_Postcard==0 &
+           xpress_delivery==0 &
+           final_reminder==0 &
+           supplemental==1),5,
+    ifelse(mailing_status==1,6, 999
+           )))))))
+
+freq(V_ANL_NH_Web_Mailing$advance_letter)
+freq(V_ANL_NH_Web_Mailing$advance_Postcard)
+freq(V_ANL_NH_Web_Mailing$xpress_delivery)
+freq(V_ANL_NH_Web_Mailing$final_reminder)
+freq(V_ANL_NH_Web_Mailing$supplemental)
+freq(V_ANL_NH_Web_Mailing$mailing4cat)
+freq(V_ANL_NH_Web_Mailing$mailing_status)
+
+
 #I have been trying to figure out how to subset when running some other procedure.
 #finally got it 
-
+remove(stand_extra)
 attach(case_fact)
 
-subset1 <- case_fact$standid ==398
+subset1 <- participant_deatails$standid ==695
+freq(case_fact$screener_pending3cat[subset1])
 freq(case_fact$released_dwelling[subset1])
 freq(case_fact$available_released_dwelling[subset1])
 freq(case_fact$vaccant_and_not_dwellings[subset1])
@@ -860,8 +1063,9 @@ freq(case_fact$completed_screener_with_sp[subset1])
 freq(case_fact$completed_screener_without_SP_neighbor[subset1])
 freq(case_fact$screener_nonresponse[subset1])
 freq(case_fact$screener_nonresponse_available_dwellings[subset1])
-freq(case_factv04$completed_screener4cat[subset1])
-
+freq(case_fact$completed_screener4cat[subset1])
+freq(participant_deatails$participant_race[which(participant_deatails$standid == 695)])
+freq(participant_deatails$participant_gender[which(participant_deatails$standid == 695)])
 
 
 freq(case_fact$released_dwelling[which(case_fact$standid ==398)])
@@ -874,17 +1078,26 @@ fwrite(participant_deatails, file="L:/2021/DHANES dashboard/V0.4/participant_det
 
 fwrite(stand_demensions,file = 'L:/2021/DHANES dashboard/V0.4/stand_demensions.csv')
 fwrite(participant_demographics_slicer, 
-       file = "L://v0.3/participant_demographics_slicer.csv")
-fwrite(gender_labels,file = "L://v0.3/gender_labels.csv")
-fwrite(race_labels,file = "L://v0.3/race_labels.csv")
+       file = "L:/2021/DHANES dashboard/V0.4/participant_demographics_slicer.csv")
+fwrite(gender_labels,file = "L:/2021/DHANES dashboard/V0.4/gender_labels.csv")
+fwrite(race_labels,file = "L:/2021/DHANES dashboard/V0.4/race_labels.csv")
 fwrite(Active_stand_label, file = "L:/2021/DHANES dashboard/v0.4/active_stand_label.csv" )
-fwrite(screener_pending3cat_labels, file = "L://v0.3/screener_pending3cat_labels.csv")
-fwrite(completed_screener4cat, file = "L://v0.3/completed_screener4cat.csv")
-fwrite(participant_demographics_slicer, file="L://v0.3/participant_demographics_slicer.csv")
-fwrite(visio_screener_process, file="L://v0.3/visio_screener_process.csv")
-fwrite(visio_screener_process_inbetween, file="L://v0.3/visio_screener_process_inbetween.csv")
-fwrite(V_Stand_Dates, file = "L:/2021/DHANES dashboard/V0.4/V_Stand_Dates.csv" )
 
+fwrite(screener_pending3cat_labels, file = "L:/2021/DHANES dashboard/V0.4/screener_pending3cat_labels.csv")
+fwrite(completed_screener4cat, file = "L:/2021/DHANES dashboard/V0.4/completed_screener4cat.csv")
+fwrite(participant_demographics_slicer, file="L:/2021/DHANES dashboard/V0.4/participant_demographics_slicer.csv")
+
+fwrite(visio_screener_process, file="L:/2021/DHANES dashboard/V0.4/visio_screener_process.csv")
+fwrite(visio_screener_process_inbetween, file="L:/2021/DHANES dashboard/V0.4/visio_screener_process_inbetween.csv")
+
+fwrite(V_Stand_Dates, file = "L:/2021/DHANES dashboard/V0.4/V_Stand_Dates.csv" )
+fwrite(Completed_Screening_forcast, file="l:/2021/DHANES dashboard/V0.4/completed_screeening_forcast.csv")
+fwrite(case_where_completed_label, file="l:/2021/DHANES dashboard/V0.4/case_where_completed_label.csv")
+fwrite(spanish_interview_labels, file="l:/2021/DHANES dashboard/V0.4/spanish_interview_labels.csv")
+
+fwrite(participant_ethnicity_labels, file="l:/2021/DHANES dashboard/V0.4/participant_ethnicity_labels.csv")
+fwrite(Interview_type_labels , file="l:/2021/DHANES dashboard/V0.4/Interview_type_labels.csv")
+fwrite(V_ANL_NH_Web_Mailing,file = "L:/2021/DHANES dashboard/V0.4/V_ANL_NH_WEB_mailing.csv")
 
 
 
