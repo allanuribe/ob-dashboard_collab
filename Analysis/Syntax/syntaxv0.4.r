@@ -119,7 +119,7 @@ ri7_var_keep <- c(
     , "RIQ004 as interview_mode"
 )
 
-# create R object with the SQL query
+ # create R object with the SQL query
 ri7_query <- paste(
     "SELECT ", paste(ri7_var_keep, sep = "", collapse= ", "),
     " FROM ANL_RI7_SAM_Case")

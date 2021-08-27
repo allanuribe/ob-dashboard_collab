@@ -1,0 +1,9 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+.Rprofile
+NHANESDashBoard.Rproj
+renv.lock
+renv/activate.R
+renv/settings.dcf
